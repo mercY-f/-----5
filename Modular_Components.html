@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Модульные компоненты (OOP Style)</title>
+    <style>
+        /* --- Global Styles --- */
+        :root {
+            --bg-body: #f0f2f5;
+            --text-main: #333;
+            --card-bg: #fff;
+            --primary: #007bff;
+            --success: #28a745;
+            --error: #dc3545;
+        }
+
+        body.dark-theme {
+            --bg-body: #18191a;
+            --text-main: #e4e6eb;
+            --card-bg: #242526;
+            --primary: #4e9df5;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg-body);
+            color: var(--text-main);
+            padding: 2rem;
+            transition: 0.3s;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Компонент-контейнер */
+        .component-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        h2 { margin-top: 0; font-size: 1.25rem; border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; }
+        button { cursor: pointer; padding: 8px 12px; background: var(--primary); color: white; border: none; border-radius: 6px; }
+        button:hover { opacity: 0.9; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        
+        /* Specific Styles for Components */
+        .counter-display { font-size: 2rem; font-weight: bold; margin-right: 1rem; }
+        
+        .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+        .calc-grid input { grid-column: span 4; text-align: right; margin-bottom: 5px; }
+        
+        .modal-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.5); display: none; 
+            justify-content: center; align-items: center; z-index: 999; 
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-body { background: var(--card-bg); padding: 2rem; border-radius: 12px; width: 300px; position: relative; }
+        
+        .progress-track { background: #e9ecef; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.3s; text-align: center; color: white; font-size: 12px; line-height: 20px; }
+        
+        .input-group { position: relative; }
+        .toggle-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; color: #555; padding: 0; }
+
+        .error-message { color: var(--error); font-size: 0.85rem; display: none; margin-top: 4px; }
+        .invalid input { border-color: var(--error); }
+        .invalid .error-message { display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- 1. Counter Component -->
+    <div class="component-card" id="counter-1">
+        <h2>1. Счётчик (Class)</h2>
+        <div style="display: flex; align-items: center;">
+            <span class="counter-display" data-target="value">0</span>
+            <button data-action="decrease">-</button>
+            <button data-action="increase" style="margin-left: 5px;">+</button>
+        </div>
+    </div>
+
+    <!-- 2. Theme Switcher -->
+    <div class="component-card" id="theme-switcher">
+        <h2>2. Тема</h2>
+        <p>Текущий режим: <strong data-target="status">Светлый</strong></p>
+        <button data-action="toggle">Переключить тему</button>
+    </div>
+
+    <!-- 3. Calculator -->
+    <div class="component-card" id="calc-1">
+        <h2>3. Калькулятор</h2>
+        <div class="calc-grid">
+            <input type="text" readonly data-target="display">
+            <button data-val="7">7</button><button data-val="8">8</button><button data-val="9">9</button><button data-val="/">/</button>
+            <button data-val="4">4</button><button data-val="5">5</button><button data-val="6">6</button><button data-val="*">*</button>
+            <button data-val="1">1</button><button data-val="2">2</button><button data-val="3">3</button><button data-val="-">-</button>
+            <button data-val="C" style="background:var(--error)">C</button><button data-val="0">0</button><button data-val="=" style="background:var(--success)">=</button><button data-val="+">+</button>
+        </div>
+    </div>
+
+    <!-- 4. Modal -->
+    <div class="component-card" id="modal-component">
+        <h2>4. Модальное окно</h2>
+        <button data-trigger="open">Открыть окно</button>
+        
+        <div class="modal-overlay" data-target="overlay">
+            <div class="modal-body">
+                <h3>Привет!</h3>
+                <p>Это полностью изолированный компонент.</p>
+                <button data-action="close">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Form Validator -->
+    <div class="component-card" id="form-validator">
+        <h2>5. Форма</h2>
+        <form novalidate>
+            <div class="input-wrapper" style="margin-bottom: 10px;">
+                <label>Email:</label>
+                <input type="email" name="email" required>
+                <div class="error-message">Введите корректный email</div>
+            </div>
+            <div class="input-wrapper" style="margin-bottom: 10px;">
+                <label>Пароль (мин 6):</label>
+                <input type="password" name="password" minlength="6" required>
+                <div class="error-message">Пароль слишком короткий</div>
+            </div>
+            <button type="submit">Войти</button>
+        </form>
+    </div>
+
+    <!-- 6. Progress Bar -->
+    <div class="component-card" id="progress-1">
+        <h2>6. Прогресс</h2>
+        <div class="progress-track">
+            <div class="progress-bar" data-target="bar">0%</div>
+        </div>
+        <button data-action="start">Загрузить</button>
+    </div>
+
+    <!-- 7. Show Password -->
+    <div class="component-card" id="pwd-toggler">
+        <h2>7. Скрыть/Показать</h2>
+        <label>Ваш секрет:</label>
+        <div class="input-group">
+            <input type="password" value="SuperSecretKey">
+            <button class="toggle-btn" data-action="toggle">👁️</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    /**
+     * Компонент 1: Counter
+     * Принимает ID корневого элемента, ищет внутри него кнопки и дисплей.
+     */
+    class Counter {
+        constructor(rootId) {
+            this.root = document.getElementById(rootId);
+            this.value = 0;
+            this.display = this.root.querySelector('[data-target="value"]');
+            
+            // Привязка событий внутри этого контейнера
+            this.root.querySelector('[data-action="decrease"]').addEventListener('click', () => this.update(-1));
+            this.root.querySelector('[data-action="increase"]').addEventListener('click', () => this.update(1));
+        }
+
+        update(change) {
+            this.value += change;
+            this.display.textContent = this.value;
+        }
+    }
+
+    /**
+     * Компонент 2: ThemeSwitcher
+     * Управляет классом body.
+     */
+    class ThemeSwitcher {
+        constructor(rootId) {
+            this.root = document.getElementById(rootId);
+            this.statusLabel = this.root.querySelector('[data-target="status"]');
+            this.btn = this.root.querySelector('[data-action="toggle"]');
+            
+            this.btn.addEventListener('click', () => this.toggle());
+        }
+
+        toggle() {
+            document.body.classList.toggle('dark-theme');
+            const isDark = document.body.classList.contains('dark-theme');
+            this.statusLabel.textContent = isDark ? 'Тёмный' : 'Светлый';
+        }
+    }
+
+    /**
+     * Компонент 3: Calculator
+     * Инкапсулирует логику вычислений.
+     */
+    class Calculator {
+        constructor(rootId) {
+            this.root = document.getElementById(rootId);
+            this.display = this.root.querySelector('[data-target="display"]');
+            
+            this.root.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    const val = e.target.dataset.val;
+                    this.handleInput(val);
+                }
+            });
+        }
+
+        handleInput(val) {
+            if (val === 'C') {
+                this.display.value = '';
+            } else if (val === '=') {
+                try {
+                    // Разрешаем только безопасные символы
+                    if (/^[0-9+\-*/().]*$/.test(this.display.value)) {
+                        this.display.value = new Function('return ' + this.display.value)();
+                    }
+                } catch {
+                    this.display.value = 'Error';
+                }
+            } else {
+                this.display.value += val;
+            }
+        }
+    }
+
+    /**
+     * Компонент 4: Modal
+     */
+    class Modal {
+        constructor(rootId) {
+            this.root = document.getElementById(rootId);
+            this.trigger = this.root.querySelector('[data-trigger="open"]');
+            this.overlay = this.root.querySelector('[data-target="overlay"]');
+            this.closeBtn = this.root.querySelector('[data-action="close"]');
+
+            this.trigger.addEventListener('click', () => this.open());
+            this.closeBtn.addEventListener('click', () => this.close());
+            
+            this.overlay.addEventListener('click', (e) => {
+                if (e.target === this.overlay) this.close();
+            });
+        }
+
+        open() { this.overlay.classList.add('active'); }
+        close() { this.overlay.classList.remove('active'); }
+    }
+
+    /**
+     * Компонент 5: FormValidator
+     * Универсальный валидатор для любой формы внутри контейнера
+     */
+    class FormValidator {
+        constructor(rootId) {
+            this.root = document.getElementById(rootId);
+            this.form = this.root.querySelector('form');
+            
+            this.form.addEventListener('submit', (e) => this.validate(e));
+            this.form.addEventListener('input', (e) => {
+                const wrapper = e.target.closest('.input-wrapper');
+                if (wrapper) wrapper.classList.remove('invalid');
+            });
+        }
+
+        validate(e) {
+            e.preventDefault();
+            let isValid = true;
+            const inputs = this.form.querySelectorAll('input');
+
+            inputs.forEach(input => {
+                const wrapper = input.closest('.input-wrapper');
+                if (!input.checkValidity()) {
+                    wrapper.classList.add('invalid');
+                    isValid = false;
+                } else {
+                    wrapper.classList.remove('invalid');
+                }
+            });
+
+            if (isValid) alert('Форма отправлена!');
+        }
+    }
+
+    /**
+     * Компонент 6: ProgressBar
+     */
+    class ProgressBar {
+        constructor(rootId) {
+            this.root = document.getElementById(rootId);
+            this.bar = this.root.querySelector('[data-target="bar"]');
+            this.btn = this.root.querySelector('[data-action="start"]');
+            
+            this.btn.addEventListener('click', () => this.start());
+        }
+
+        start() {
+            if (this.btn.disabled) return;
+            this.btn.disabled = true;
+            let width = 0;
+            this.bar.style.width = '0%';
+            
+            const interval = setInterval(() => {
+                if (width >= 100) {
+                    clearInterval(interval);
+                    this.btn.disabled = false;
+                } else {
+                    width++;
+                    this.bar.style.width = width + '%';
+                    this.bar.textContent = width + '%';
+                }
+            }, 20);
+        }
+    }
+
+    /**
+     * Компонент 7: PasswordToggle
+     */
+    class PasswordToggle {
+        constructor(rootId) {
+            this.root = document.getElementById(rootId);
+            this.input = this.root.querySelector('input');
+            this.btn = this.root.querySelector('[data-action="toggle"]');
+            
+            this.btn.addEventListener('click', () => this.toggle());
+        }
+
+        toggle() {
+            const isPassword = this.input.type === 'password';
+            this.input.type = isPassword ? 'text' : 'password';
+            this.btn.textContent = isPassword ? '🚫' : '👁️';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        new Counter('counter-1');
+        new ThemeSwitcher('theme-switcher');
+        new Calculator('calc-1');
+        new Modal('modal-component');
+        new FormValidator('form-validator');
+        new ProgressBar('progress-1');
+        new PasswordToggle('pwd-toggler');
+    });
+
+</script>
+
+</body>
+</html>
