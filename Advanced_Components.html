@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced JS Components</title>
+    <style>
+        /* --- GLOBAL RESET & VARS --- */
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #a29bfe;
+            --text: #2d3436;
+            --bg: #dfe6e9;
+            --card-bg: #ffffff;
+            --error: #d63031;
+            --success: #00b894;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            gap: 40px;
+        }
+
+        h1 { text-align: center; }
+        
+        /* Обертка для демо */
+        .component-wrapper {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .component-wrapper h2 { margin-top: 0; border-bottom: 2px solid var(--primary); display: inline-block; }
+
+        /* Элементы управления для теста (вне логики компонентов) */
+        .controls {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #eee;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        label { font-size: 0.9rem; font-weight: bold; }
+        input[type="number"] { width: 60px; padding: 5px; }
+
+        /* =========================================
+           1. СЛАЙДЕР (STYLES)
+           ========================================= */
+        .slider-container {
+            width: 100%;
+            overflow: hidden; /* Скрываем всё, что не влезает */
+            position: relative;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        .slider-track {
+            display: flex;
+            transition: transform 0.5s ease-in-out; /* Скорость меняется через JS */
+            width: 100%;
+        }
+
+        .slide {
+            flex-shrink: 0; /* Не сжимать слайды */
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            color: white;
+            font-weight: bold;
+            box-sizing: border-box;
+            border: 2px solid white;
+        }
+        /* Цвета для слайдов для наглядности */
+        .slide:nth-child(odd) { background: var(--primary); }
+        .slide:nth-child(even) { background: var(--secondary); }
+
+        .slider-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none; /* Чтобы клики проходили сквозь контейнер кнопок */
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+
+        .slider-btn {
+            pointer-events: auto;
+            background: rgba(255,255,255,0.8);
+            border: none;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .slider-btn:hover { background: #fff; transform: scale(1.1); }
+
+        /* =========================================
+           2. МОДАЛЬНОЕ ОКНО (STYLES)
+           ========================================= */
+        /* Фон (оверлей) не нужен для draggable окна в стиле "OS", 
+           но мы оставим его прозрачным или уберем pointer-events, если хотим работать с фоном.
+           В данном задании сделаем классическое окно поверх всего. */
+        
+        .modal-view {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            /* Начальные координаты задаются JS, либо центр */
+            left: 50%; top: 50%;
+            /* Размеры по умолчанию */
+            width: 400px;
+            height: 250px;
+            background: var(--card-bg);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            overflow: hidden;
+            display: none; /* Скрыто изначально */
+            flex-direction: column;
+            
+            /* Важно для начального позиционирования */
+            transform: translate(-50%, -50%); 
+        }
+        
+        /* Когда окно активно (открыто) */
+        .modal-view.active { display: flex; }
+
+        /* Шапка для перетаскивания */
+        .modal-header {
+            background: var(--primary);
+            color: white;
+            padding: 10px 15px;
+            cursor: move; /* Курсор перетаскивания */
+            user-select: none; /* Чтобы текст не выделялся при перетаскивании */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-content-area {
+            padding: 20px;
+            flex-grow: 1;
+            overflow: auto;
+        }
+
+        .modal-close {
+            background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;
+        }
+
+        /* Уголок для ресайза */
+        .modal-resizer {
+            width: 15px;
+            height: 15px;
+            background: linear-gradient(135deg, transparent 50%, var(--primary) 50%);
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            cursor: nwse-resize; /* Курсор изменения размера */
+            z-index: 10;
+        }
+
+        /* =========================================
+           3. ФОРМА CSS-ONLY (STYLES)
+           ========================================= */
+        /* Трюк: 
+           1. :invalid - поле невалидно
+           2. :not(:placeholder-shown) - поле не пустое (пользователь что-то ввел)
+           3. Плюс (+) селектор для показа ошибки
+        */
+
+        .css-form-group {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .css-form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .css-form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+
+        /* Сообщение об ошибке скрыто по умолчанию */
+        .css-error-msg {
+            display: none;
+            color: var(--error);
+            font-size: 0.85rem;
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+        }
+
+        /* ВАЛИДНОЕ СОСТОЯНИЕ (зеленая рамка) */
+        /* Показываем только если placeholder не показан (юзер начал ввод) и поле валидно */
+        .css-form-group input:not(:placeholder-shown):valid {
+            border-color: var(--success);
+        }
+
+        /* НЕВАЛИДНОЕ СОСТОЯНИЕ (красная рамка и текст) */
+        .css-form-group input:not(:placeholder-shown):invalid {
+            border-color: var(--error);
+            animation: shake 0.3s;
+        }
+
+        /* Показываем ошибку, если инпут невалиден и не пуст */
+        .css-form-group input:not(:placeholder-shown):invalid + .css-error-msg {
+            display: block;
+        }
+
+        /* Стилизация подсказок браузера (опционально) */
+        input:required { box-shadow: none; }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+            100% { transform: translateX(0); }
+        }
+
+        button.submit-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        /* Кнопка "неактивна" визуально через CSS :has (современный css) или просто через :invalid формы */
+        form:invalid button.submit-btn {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Advanced Components HW</h1>
+
+    <!-- 1. ADVANCED SLIDER -->
+    <div class="component-wrapper">
+        <h2>1. Адаптивный Слайдер</h2>
+        
+        <div class="controls">
+            <label>Скорость (ms): <input type="number" id="setting-speed" value="500" step="100"></label>
+            <label>Слайдов за раз: <input type="number" id="setting-count" value="1" min="1" max="3"></label>
+            <button onclick="sliderApp.toggleDirection()">Сменить направление</button>
+        </div>
+
+        <div class="slider-container" id="my-slider">
+            <div class="slider-track">
+                <div class="slide">1</div>
+                <div class="slide">2</div>
+                <div class="slide">3</div>
+                <div class="slide">4</div>
+                <div class="slide">5</div>
+                <div class="slide">6</div>
+                <div class="slide">7</div>
+                <div class="slide">8</div>
+            </div>
+            <div class="slider-nav">
+                <button class="slider-btn" data-action="prev">&lt;</button>
+                <button class="slider-btn" data-action="next">&gt;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. DRAGGABLE MODAL -->
+    <div class="component-wrapper">
+        <h2>2. Перетаскиваемое окно</h2>
+        <p>Нажмите кнопку, чтобы открыть окно. Затем попробуйте перетащить его за синий заголовок или изменить размер, потянув за правый нижний угол.</p>
+        <button class="submit-btn" id="open-modal-btn">Открыть окно</button>
+    </div>
+
+    <!-- Само модальное окно (вне потока) -->
+    <div class="modal-view" id="drag-modal">
+        <div class="modal-header" id="drag-header">
+            <span>Drag Me!</span>
+            <button class="modal-close" id="close-modal-btn">&times;</button>
+        </div>
+        <div class="modal-content-area">
+            <h3>Изменяемый контент</h3>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+            <p>Потяни за уголок справа-внизу &rarr;</p>
+        </div>
+        <div class="modal-resizer" id="resize-handle"></div>
+    </div>
+
+
+    <!-- 3. CSS FORM VALIDATION -->
+    <div class="component-wrapper">
+        <h2>3. CSS Валидация (Без JS)</h2>
+        <p>Попробуйте ввести некорректные данные или оставить поля пустыми. Ошибки появятся только после начала ввода (blur).</p>
+        
+        <form action="#" onsubmit="alert('Успешно!'); return false;">
+            
+            <!-- Поле Имя: только буквы, мин 2 -->
+            <div class="css-form-group">
+                <label>Имя (только буквы):</label>
+                <!-- pattern: только буквы, required -->
+                <input type="text" placeholder="Введите имя" pattern="[A-Za-zА-Яа-яЁё]{2,}" required>
+                <span class="css-error-msg">Используйте только буквы (мин. 2)</span>
+            </div>
+
+            <!-- Поле Email: стандартный тип email -->
+            <div class="css-form-group">
+                <label>Email:</label>
+                <input type="email" placeholder="email@example.com" required>
+                <span class="css-error-msg">Введите корректный email адрес</span>
+            </div>
+
+            <!-- Поле Пароль: мин 6 символов, цифра и буква -->
+            <div class="css-form-group">
+                <label>Пароль (сложный):</label>
+                <input type="password" placeholder="Пароль" pattern="(?=.*\d)(?=.*[a-z]).{6,}" required>
+                <span class="css-error-msg">Мин. 6 символов, должна быть цифра и буква</span>
+            </div>
+
+            <button class="submit-btn" type="submit">Отправить</button>
+        </form>
+    </div>
+
+</div>
+
+<script>
+    /**
+     * КОМПОНЕНТ 1: AdvancedSlider
+     * Реализует логику слайдера с настройками
+     */
+    class AdvancedSlider {
+        constructor(containerId, options = {}) {
+            this.container = document.getElementById(containerId);
+            this.track = this.container.querySelector('.slider-track');
+            this.slides = Array.from(this.track.children);
+            
+            // Настройки по умолчанию
+            this.settings = {
+                itemsToShow: options.itemsToShow || 3, // Сколько видно на экране (для адаптива)
+                itemsPerScroll: 1, // Сколько пролистывать
+                speed: 500, // Скорость анимации
+                direction: 1 // 1 = вперед, -1 = назад (для кнопок)
+            };
+
+            this.currentIndex = 0;
+            this.containerWidth = 0;
+
+            // Инициализация
+            this.init();
+
+            // Слушаем изменение размеров контейнера (Responsive)
+            // ResizeObserver лучше чем window.onresize, так как следит именно за блоком
+            this.resizeObserver = new ResizeObserver(() => this.recalculateDimensions());
+            this.resizeObserver.observe(this.container);
+
+            // Кнопки
+            this.container.querySelector('[data-action="next"]').addEventListener('click', () => this.move('next'));
+            this.container.querySelector('[data-action="prev"]').addEventListener('click', () => this.move('prev'));
+        }
+
+        init() {
+            // Установка начальных стилей анимации
+            this.updateSpeed(this.settings.speed);
+            this.recalculateDimensions();
+        }
+
+        updateSpeed(ms) {
+            this.settings.speed = ms;
+            this.track.style.transitionDuration = `${ms}ms`;
+        }
+
+        updateScrollCount(n) {
+            this.settings.itemsPerScroll = parseInt(n);
+        }
+
+        toggleDirection() {
+            // Инвертируем логику кнопок (для примера "смены направления")
+            this.settings.direction *= -1;
+            alert(`Направление кнопок изменено! Теперь "Вправо" листает ${this.settings.direction === 1 ? 'вперед' : 'назад'}.`);
+        }
+
+        recalculateDimensions() {
+            // 1. Узнаем ширину контейнера
+            this.containerWidth = this.container.offsetWidth;
+
+            // 2. Адаптивность: если экран узкий, показываем меньше слайдов
+            let visibleSlides = this.settings.itemsToShow;
+            if (this.containerWidth < 600) visibleSlides = 1;
+            else if (this.containerWidth < 800) visibleSlides = 2;
+
+            // 3. Расчет ширины одного слайда в %
+            const slideWidthPercent = 100 / visibleSlides;
+            
+            // Применяем ширину ко всем слайдам
+            this.slides.forEach(slide => {
+                slide.style.width = `${slideWidthPercent}%`;
+                // Или через flex-basis, если нужно
+                slide.style.flexBasis = `${slideWidthPercent}%`;
+            });
+
+            this.visibleSlides = visibleSlides; // запоминаем текущее состояние
+            this.updatePosition();
+        }
+
+        move(directionStr) {
+            // Определяем направление с учетом настройки direction
+            const dir = directionStr === 'next' ? 1 * this.settings.direction : -1 * this.settings.direction;
+            
+            const step = this.settings.itemsPerScroll;
+            
+            // Обновляем индекс
+            this.currentIndex += dir * step;
+
+            // Проверка границ (Loop или Stop)
+            // Здесь реализуем "Stop" логику, чтобы не усложнять бесконечной каруселью
+            const maxIndex = this.slides.length - this.visibleSlides;
+            
+            if (this.currentIndex < 0) this.currentIndex = 0;
+            if (this.currentIndex > maxIndex) this.currentIndex = maxIndex;
+
+            this.updatePosition();
+        }
+
+        updatePosition() {
+            // Сдвигаем трек на (ширина слайда в % * индекс)
+            const slideWidth = 100 / this.visibleSlides;
+            const translateX = -(this.currentIndex * slideWidth);
+            this.track.style.transform = `translateX(${translateX}%)`;
+        }
+    }
+
+    /**
+     * КОМПОНЕНТ 2: InteractiveModal
+     * Drag & Drop + Resize
+     */
+    class InteractiveModal {
+        constructor(modalId, openerId, closerId) {
+            this.modal = document.getElementById(modalId);
+            this.header = this.modal.querySelector('.modal-header');
+            this.resizer = this.modal.querySelector('.modal-resizer');
+            
+            // Кнопки открытия/закрытия
+            document.getElementById(openerId).addEventListener('click', () => {
+                this.modal.classList.add('active');
+                // Сброс позиции в центр при открытии (опционально)
+                this.modal.style.top = '50%';
+                this.modal.style.left = '50%';
+                this.modal.style.width = '400px';
+                this.modal.style.height = '250px';
+                this.modal.style.transform = 'translate(-50%, -50%)'; // Возвращаем центрирование CSS
+            });
+
+            document.getElementById(closerId).addEventListener('click', () => {
+                this.modal.classList.remove('active');
+            });
+
+            // Инициализация механик
+            this.initDrag();
+            this.initResize();
+        }
+
+        initDrag() {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            this.header.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                
+                // Получаем текущие координаты мыши
+                startX = e.clientX;
+                startY = e.clientY;
+
+                // Получаем текущую позицию окна
+                const rect = this.modal.getBoundingClientRect();
+                
+                // Важно: если у элемента transform: translate(-50%, -50%), 
+                // то left/top работают относительно центра.
+                // Чтобы драг работал плавно, лучше убрать transform после первого клика 
+                // и позиционировать чисто через left/top в пикселях.
+                
+                this.modal.style.transform = 'none'; 
+                this.modal.style.left = rect.left + 'px';
+                this.modal.style.top = rect.top + 'px';
+                
+                initialLeft = rect.left;
+                initialTop = rect.top;
+
+                // Курсор
+                document.body.style.cursor = 'move';
+            });
+
+            // Слушаем движение на document, чтобы не терять фокус если мышь вылетит
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                this.modal.style.left = `${initialLeft + dx}px`;
+                this.modal.style.top = `${initialTop + dy}px`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                document.body.style.cursor = 'default';
+            });
+        }
+
+        initResize() {
+            let isResizing = false;
+            let startX, startY, startW, startH;
+
+            this.resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                e.stopPropagation(); // Чтобы не срабатывал драг, если случайно зацепим
+
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                // Текущие размеры
+                const rect = this.modal.getBoundingClientRect();
+                startW = rect.width;
+                startH = rect.height;
+
+                document.body.style.cursor = 'nwse-resize';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                // Минимальные размеры (чтобы не схлопнуть в ноль)
+                const newW = Math.max(200, startW + dx);
+                const newH = Math.max(150, startH + dy);
+
+                this.modal.style.width = `${newW}px`;
+                this.modal.style.height = `${newH}px`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+            });
+        }
+    }
+
+    // --- ЗАПУСК ---
+    // 1. Slider
+    const sliderApp = new AdvancedSlider('my-slider', { itemsToShow: 3 });
+
+    // Привязка инпутов настроек к слайдеру
+    document.getElementById('setting-speed').addEventListener('change', (e) => {
+        sliderApp.updateSpeed(e.target.value);
+    });
+    document.getElementById('setting-count').addEventListener('change', (e) => {
+        sliderApp.updateScrollCount(e.target.value);
+    });
+
+    // 2. Modal
+    new InteractiveModal('drag-modal', 'open-modal-btn', 'close-modal-btn');
+
+    // 3. Form - JS не нужен для валидации, работает на CSS.
+</script>
+
+</body>
+</html>
